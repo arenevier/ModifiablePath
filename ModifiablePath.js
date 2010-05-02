@@ -105,10 +105,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
 
         if (!this.handlers.drag) {
             var dragOptions = {
-                onDrag: function(dragFeature, pixel) {
+                geometryTypes: "OpenLayers.Geometry.Point",
+
+                onDrag: OpenLayers.Function.bind(function(dragFeature, pixel) {
+                    this.callback("modify", [dragFeature, this.line]);
                     this.layer.redraw();
-                },
-                geometryTypes: "OpenLayers.Geometry.Point"
+                }, this)
             }
             this.handlers.drag = new OpenLayers.Control.DragFeature(this.layer, dragOptions);
             this.map.addControl(this.handlers.drag);
@@ -367,6 +369,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                 feat.geometry.components.splice(idx, 1);
             }
         }
+        this.callback("delete", [feature, feature.layer.features]);
         feature.destroy();
         this.layer.redraw();
         OpenLayers.Element.removeClass(
