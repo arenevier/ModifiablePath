@@ -5,6 +5,8 @@
 
 /**
  * @requires OpenLayers/Handler/Point.js
+ * @requires OpenLayers/Handler/Keyboard.js
+ * @requires OpenLayers/Handler/Feature.js
  * @requires OpenLayers/Geometry/Point.js
  * @requires OpenLayers/Geometry/LineString.js
  * @requires OpenLayers/Feature/Vector.js
@@ -28,10 +30,23 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     line: null,
 
     /**
-     * Property: dragControl
-     * {<OpenLayers.Control.DragFeature>}
+     * Property: handlers
+     * {Object} Object with references to multiple <OpenLayers.Handler>
+     *     instances.
      */
-    dragControl: null,
+    handlers: null,
+
+    /**
+     * Property: deleteKey
+     * {int} key to use to enter delete mode
+     */
+    deleteKey: 16, // shift
+
+    /**
+     * Property: deleteMode
+     * {Boolean} true if we're in delete mode
+     */
+    deleteMode: false,
 
     /**
      * Constructor: OpenLayers.Handler.ModifiablePath
@@ -57,6 +72,13 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      */
     initialize: function(control, callbacks, options) {
         OpenLayers.Handler.Point.prototype.initialize.apply(this, arguments);
+        var keyboardCallbacks = {
+            keydown: this.handleKeyEvent,
+            keyup: this.handleKeyEvent
+        };
+        this.handlers = OpenLayers.Util.extend({
+            keyboard: new OpenLayers.Handler.Keyboard(this, keyboardCallbacks)
+        }, this.handlers);
     },
 
     /**
@@ -68,19 +90,6 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      *     feature.
      */
     createFeature: function(pixel) {
-        var handler = this;
-        if (!this.dragControl) {
-            var dragOptions = {
-                onDrag: function(dragFeature, pixel) {
-                    this.layer.redraw();
-                },
-                geometryTypes: "OpenLayers.Geometry.Point"
-            }
-            this.dragControl = new OpenLayers.Control.DragFeature(this.layer, dragOptions);
-            this.control.map.addControl(this.dragControl);
-        }
-        this.dragControl.activate();
-
         var lonlat = this.control.map.getLonLatFromPixel(pixel);
         this.point = new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.Point(lonlat.lon, lonlat.lat)
@@ -91,8 +100,55 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         this.callback("create", [this.point.geometry, this.line]);
         this.point.geometry.clearBounds();
         // XXX: add point before line, otherwise, Canvas.getFeatureIdFromEvent
-        // returns the line, and we need the point for dragControl
+        // returns the line, and we need the point for handlers.drag
         this.layer.addFeatures([this.point, this.line], {silent: true});
+
+        if (!this.handlers.drag) {
+            var dragOptions = {
+                onDrag: function(dragFeature, pixel) {
+                    this.layer.redraw();
+                },
+                geometryTypes: "OpenLayers.Geometry.Point"
+            }
+            this.handlers.drag = new OpenLayers.Control.DragFeature(this.layer, dragOptions);
+            this.map.addControl(this.handlers.drag);
+        }
+
+        if (!this.handlers.feature) {
+            var featureCallbacks = {
+                click: this.clickFeatureEvent,
+                over: this.overFeatureEvent,
+                out: this.outFeatureEvent
+            }
+            var featureOptions = {
+                geometryTypes: "OpenLayers.Geometry.Point"
+            }
+            this.handlers.feature = new OpenLayers.Handler.Feature(this, this.layer, featureCallbacks);
+            this.handlers.feature.click = function(evt) {
+                Event.stop(evt);
+                return this.handle(evt) ? !this.stopClick : true;
+            }
+            this.map.events.register("mouseout", this, function(evt) {
+                // when mouse leaves map area, leave delete mode
+                if (this.deleteMode) {
+                    var target = (evt.relatedTarget) ? evt.relatedTarget : evt.toElement;
+                    var par = target;
+                    while (par) {
+                        if (par == this.map.viewPortDiv) {
+                            // mouseout occured to another element of map
+                            // viewport. Do not leave delete mode
+                            return;
+                        }
+                        par = par.parentNode;
+                    }
+                    this.enterDeleteMode(false);
+                }
+            });
+        }
+
+        for (var item in this.handlers) {
+            this.handlers[item].activate();
+        }
     },
 
     /**
@@ -113,7 +169,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             this.point.geometry, this.line.geometry.components.length
         );
         if (this.layer.renderer instanceof OpenLayers.Renderer.Canvas) {
-            // XXX: to have dragControl working, we need getFeatureIdFromEvent
+            // XXX: to have handlers.drag working, we need getFeatureIdFromEvent
             // to return Point (and not LineString). So, we erase this.line.
             // As, it will be added back in drawFeature, it will after Point in
             // array position, and getFeatureIdFromEvent will return correct
@@ -157,12 +213,14 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      */
     finalize: function(cancel) {
         OpenLayers.Handler.Point.prototype.finalize.apply(this, arguments);
-        this.dragControl.deactivate();
+        for (var item in this.handlers) {
+            this.handlers[item].deactivate();
+        }
     },
 
     /**
      * Method: mousedown
-     * Handle mouse down.  Do nothing. New points are added on mouseup
+     * Handle mouse down.
      * 
      * Parameters:
      * evt - {Event} The browser event
@@ -171,6 +229,9 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * {Boolean} Allow event propagation
      */
     mousedown: function(evt) {
+        if (this.deleteMode) {
+            return true;
+        }
         this.mouseDown = true;
         this.lastDown = evt.xy;
         return true;
@@ -203,12 +264,15 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * {Boolean} Allow event propagation
      */
     mouseup: function (evt) {
-        if (this.dragControl && 
-            (this.dragControl.handlers.drag.start != this.dragControl.handlers.drag.last)) {
+        if (this.deleteMode) {
+            return true;
+        }
+        if (this.handlers.drag && 
+            (this.handlers.drag.handlers.drag.start != this.handlers.drag.handlers.drag.last)) {
             // we are modifying a point, return
             return true;
         }
-        if (this.dragControl && this.dragControl.handlers.drag.started) {
+        if (this.handlers.drag && this.handlers.drag.handlers.drag.started) {
             return true;
         }
         // double-clicks
@@ -229,6 +293,118 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         this.drawing = true;
         this.lastUp = evt.xy;
         return true;
+    },
+
+    /**
+     * Method: handleKeyEvent
+     * Handle keyup and keydown events. Enter deleteMode when deleteKey has
+     * been pressed. Leave deleteMode when deleteKey has been released.
+     * 
+     * Parameters:
+     * evt - {Event} The browser event
+     */
+    handleKeyEvent: function (evt) {
+        if (evt.keyCode != this.deleteKey) {
+            return;
+        }
+        if (evt.type == "keydown" && this.deleteMode) {
+            return;
+        }
+        if (evt.type == "keyup" && !this.deleteMode) {
+            return;
+        }
+        this.enterDeleteMode(!this.deleteMode);
+    },
+
+    /**
+     * Method: enterDeleteMode
+     * Method to enter or leave delete mode.
+     * 
+     * Parameters:
+     * {Boolean} true to enter, false to leave
+     */
+    enterDeleteMode: function (mode) {
+        if (mode == true && this.layer.features.length <= 2) { // 2: line + one point
+            return;
+        }
+        this.deleteMode = mode;
+        for (var i = this.layer.features.length; i-->0;) {
+            var feature = this.layer.features[i];
+            if (feature.geometry instanceof OpenLayers.Geometry.Point) {
+                feature.renderIntent = this.deleteMode ? "select": "";
+                this.layer.drawFeature(feature);
+            }
+        }
+        if (this.deleteMode) {
+            this.handlers.drag.deactivate();
+        } else {
+            this.handlers.drag.activate();
+        }
+    },
+
+    /**
+     * Method: clickFeatureEvent
+     * Handle click on a feature. If we are in deleteMode, remove that feature.
+     * 
+     * Parameters:
+     * feature - {OpenLayers.Feature.Vector} Feature that was clicked
+     */
+    clickFeatureEvent: function (feature) {
+        if (!this.deleteMode) {
+            return;
+        }
+        for (var i = feature.layer.features.length; i-->0; ) {
+            var feat = feature.layer.features[i];
+            if (feat == feature) {
+                continue;
+            }
+            if (!feat.geometry.components) {
+                continue;
+            }
+
+            var idx = feat.geometry.components.indexOf(feature.geometry);
+            if (idx != -1) {
+                feat.geometry.components.splice(idx, 1);
+            }
+        }
+        feature.destroy();
+        this.layer.redraw();
+        OpenLayers.Element.removeClass(
+            this.map.viewPortDiv, "olModifiablePathOver"
+        );
+        if (this.layer.features.length <= 2) { // 2: line + one point
+            this.enterDeleteMode(false);
+        }
+    },
+
+    /**
+     * Method: overFeatureEvent
+     * Handle overing on a feature. If we are in deleteMode, modify viewport classname
+     * 
+     * Parameters:
+     * feature - {OpenLayers.Feature.Vector} Feature that was clicked
+     */
+    overFeatureEvent: function (feature) {
+        if (!this.deleteMode)
+            return;
+        OpenLayers.Element.addClass(
+                this.map.viewPortDiv, "olModifiablePathOver"
+        );
+    },
+
+    /**
+     * Method: outFeatureEvent
+     * Handle out of a feature. If we are in deleteMode, modify viewport classname
+     * 
+     * Parameters:
+     * feature - {OpenLayers.Feature.Vector} Feature that was clicked
+     */
+    outFeatureEvent: function (feature) {
+        if (!this.deleteMode)
+            return;
+        OpenLayers.Element.removeClass(
+                this.map.viewPortDiv, "olModifiablePathOver"
+        );
     },
 
     CLASS_NAME: "OpenLayers.Handler.ModifiablePath"
