@@ -49,6 +49,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     deleteMode: false,
 
     /**
+     * Property: lastMoveDrag
+     * {Boolean} true if last time mouse was down, a drag action occured
+     */
+    lastMoveDrag: false,
+
+    /**
      * Constructor: OpenLayers.Handler.ModifiablePath
      * Create a new path hander
      *
@@ -108,6 +114,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                 geometryTypes: "OpenLayers.Geometry.Point",
 
                 onDrag: OpenLayers.Function.bind(function(dragFeature, pixel) {
+                    this.lastMoveDrag = true;
                     this.callback("modify", [dragFeature, this.line]);
                     this.layer.redraw();
                 }, this)
@@ -234,6 +241,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         if (this.deleteMode) {
             return true;
         }
+        this.lastMoveDrag = false;
         this.mouseDown = true;
         this.lastDown = evt.xy;
         return true;
@@ -269,12 +277,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         if (this.deleteMode) {
             return true;
         }
-        if (this.handlers.drag && 
-            (this.handlers.drag.handlers.drag.start != this.handlers.drag.handlers.drag.last)) {
-            // we are modifying a point, return
-            return true;
-        }
-        if (this.handlers.drag && this.handlers.drag.handlers.drag.started) {
+        if (this.lastMoveDrag) {
             return true;
         }
         // double-clicks
