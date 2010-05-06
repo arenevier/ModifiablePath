@@ -115,8 +115,50 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
 
                 onDrag: OpenLayers.Function.bind(function(dragFeature, pixel) {
                     this.lastMoveDrag = true;
+                    var components = this.line.geometry.components;
+                    var idx = OpenLayers.Util.indexOf(components, dragFeature.geometry);
+                    if (idx == -1) {
+                        return;
+                    }
+
+                    var nextPoint, previousPoint, middlePoint;
+                    if (dragFeature.type == "middle") {
+                        nextPoint = components[idx + 1];
+                        previousPoint = components[idx - 1];
+                        dragFeature.type = "";
+
+                        if (nextPoint) {
+                            this.addMiddlePoint(
+                                (dragFeature.geometry.x + nextPoint.x) / 2,
+                                (dragFeature.geometry.y + nextPoint.y) / 2,
+                                dragFeature, "after");
+                        }
+                        if (previousPoint) {
+                            this.addMiddlePoint(
+                                    (dragFeature.geometry.x + previousPoint.x) / 2,
+                                    (dragFeature.geometry.y + previousPoint.y) / 2,
+                                    dragFeature, "before");
+                        }
+                    } else {
+
+                        nextPoint = components[idx + 2];
+                        if (nextPoint) {
+                            middlePoint = components[idx + 1];
+                            middlePoint.move((dragFeature.geometry.x + nextPoint.x) / 2 - middlePoint.x,
+                                             (dragFeature.geometry.y + nextPoint.y) / 2 - middlePoint.y);
+                        }
+
+                        previousPoint = components[idx - 2];
+                        if (previousPoint) {
+                            middlePoint = components[idx - 1];
+                            middlePoint.move((dragFeature.geometry.x + previousPoint.x) / 2 - middlePoint.x,
+                                             (dragFeature.geometry.y + previousPoint.y) / 2 - middlePoint.y);
+                        }
+                    }
+
                     this.callback("modify", [dragFeature, this.line]);
-                    this.layer.redraw();
+                    this.drawFeature();
+
                 }, this)
             }
             this.handlers.drag = new OpenLayers.Control.DragFeature(this.layer, dragOptions);
@@ -169,25 +211,92 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * pixel - {<OpenLayers.Pixel>} The pixel location for the new point.
      */
     addPoint: function(pixel) {
-        var lonlat = this.control.map.getLonLatFromPixel(pixel);
+        var lonlat = this.map.getLonLatFromPixel(pixel);
+        var middlePoint = new OpenLayers.Feature.Vector(
+            new OpenLayers.Geometry.Point((this.point.geometry.x + lonlat.lon) / 2, (this.point.geometry.y + lonlat.lat) / 2)
+        );
+        middlePoint.type = "middle";
+
         this.point = new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.Point(lonlat.lon, lonlat.lat)
         );
-        this.layer.addFeatures([this.point]);
+
+        this.layer.addFeatures([middlePoint, this.point]);
+        this.line.geometry.addComponent(
+            middlePoint.geometry, this.line.geometry.components.length
+        );
         this.line.geometry.addComponent(
             this.point.geometry, this.line.geometry.components.length
         );
-        if (this.layer.renderer instanceof OpenLayers.Renderer.Canvas) {
-            // XXX: to have handlers.drag working, we need getFeatureIdFromEvent
-            // to return Point (and not LineString). So, we erase this.line.
-            // As, it will be added back in drawFeature, it will after Point in
-            // array position, and getFeatureIdFromEvent will return correct
-            // answer
-            this.layer.renderer.eraseFeatures(this.line);
-        }
+
         this.callback("point", [this.point.geometry, this.getGeometry()]);
         this.callback("modify", [this.point.geometry, this.line]);
         this.drawFeature();
+    },
+
+    /**
+     * Method: removeFeature
+     * removes a feature from path
+     *
+     * Parameters:
+     * feature - {OpenLayers.Feature.Vector} Feature to remove
+     */
+    removeFeature: function(feature) {
+        this.line.geometry.removeComponent(feature.geometry);
+        feature.destroy();
+        this.layer.removeFeatures([feature], { silent: (feature.type == "middle" ? true: false)});
+
+        if (this.point == feature) {
+            for (var i = this.layer.features.length; i-->0; ) {
+                var feat = this.layer.features[i];
+                if (feat.geometry instanceof OpenLayers.Geometry.Point && feat.type != "middle") {
+                    this.point = feat;
+                    break;
+                }
+            }
+        }
+    },
+
+    /**
+     * Method: addMiddlePoint
+     * add a middle point to path
+     *
+     * Parameters:
+     * x - {float}
+     * y - {float}
+     * feature - {OpenLayers.Feature.Vector} Feature near which to place middle point
+     * after: {string} or {boolean} to determine wether we want point to be
+     *  before or after feature. Argument can be string "before" or "after" or
+     *  be a boolean.
+     *
+     */
+    addMiddlePoint: function(x, y, feature, after) {
+        var idx = OpenLayers.Util.indexOf(this.layer.features, feature);
+        if (idx == -1) {
+            return false;
+        }
+        if (after == "after") {
+            after = true;
+        } else if (after == "before") {
+            after = false;
+        }
+
+        var point = new OpenLayers.Feature.Vector(
+                            new OpenLayers.Geometry.Point(x, y)
+                    );
+        point.type = "middle";
+        point.layer = this.layer;
+
+        var jdx = OpenLayers.Util.indexOf(this.line.geometry.components, feature.geometry);
+        if (after) {
+            this.layer.features.splice(idx + 1, 0, point);
+            this.line.geometry.addComponent( point.geometry, jdx  + 1);
+        } else {
+            this.layer.features.splice(idx, 0, point);
+            this.line.geometry.addComponent( point.geometry, jdx);
+        }
+
+        return true;
     },
 
     /**
@@ -195,8 +304,15 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * Render geometries on the temporary layer.
      */
     drawFeature: function() {
-        this.layer.drawFeature(this.point, this.style);
-        this.layer.drawFeature(this.line, this.style);
+        if (this.layer.renderer instanceof OpenLayers.Renderer.Canvas) {
+            // XXX: to have handlers.drag working, we need getFeatureIdFromEvent
+            // to return Point (and not LineString). So, we erase this.line.
+            // As, it will be added back in layer.redrawe, it will be after
+            // Point in array position, and getFeatureIdFromEvent will return
+            // correct answer
+            this.layer.renderer.eraseFeatures(this.line);
+        }
+        this.layer.redraw();
     },
 
     /**
@@ -214,13 +330,19 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
 
     /**
      * Method: finalize
-     * Finish the geometry
+     * Finish the geometry: remove all middle points and deactivate handlers
      *
      * Parameters:
      * cancel - {Boolean} Call cancel instead of done callback.  Default is
      *     false.
      */
     finalize: function(cancel) {
+        for (var i = this.layer.features.length; i-->0; ) {
+            var feat = this.layer.features[i];
+            if (feat.geometry instanceof OpenLayers.Geometry.Point && feat.type == "middle") {
+                this.removeFeature(feat);
+            }
+        }
         OpenLayers.Handler.Point.prototype.finalize.apply(this, arguments);
         for (var item in this.handlers) {
             this.handlers[item].deactivate();
@@ -230,11 +352,11 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     /**
      * Method: mousedown
      * Handle mouse down.
-     * 
+     *
      * Parameters:
      * evt - {Event} The browser event
      *
-     * Returns: 
+     * Returns:
      * {Boolean} Allow event propagation
      */
     mousedown: function(evt) {
@@ -251,11 +373,11 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * Method: mousemove
      * Handle mouse move.  Do nothing. If mousemove modify path, it's not
      * possible to select an anterior point anymore.
-     * 
+     *
      * Parameters:
      * evt - {Event} The browser event
      *
-     * Returns: 
+     * Returns:
      * {Boolean} Allow event propagation
      */
     mousemove: function (evt) {
@@ -266,11 +388,11 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * Method: mouseup
      * Handle mouse up.  Add a new point to the geometry and
      * render it. Return determines whether to propagate the event on the map.
-     * 
+     *
      * Parameters:
      * evt - {Event} The browser event
      *
-     * Returns: 
+     * Returns:
      * {Boolean} Allow event propagation
      */
     mouseup: function (evt) {
@@ -282,7 +404,8 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         }
         // double-clicks
         if (this.lastUp && this.lastUp.equals(evt.xy)) {
-            return this.finalize();
+            this.finalize();
+            return true;
         }
 
         if(this.lastUp == null) {
@@ -304,7 +427,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * Method: handleKeyEvent
      * Handle keyup and keydown events. Enter deleteMode when deleteKey has
      * been pressed. Leave deleteMode when deleteKey has been released.
-     * 
+     *
      * Parameters:
      * evt - {Event} The browser event
      */
@@ -324,18 +447,18 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     /**
      * Method: enterDeleteMode
      * Method to enter or leave delete mode.
-     * 
+     *
      * Parameters:
      * {Boolean} true to enter, false to leave
      */
     enterDeleteMode: function (mode) {
-        if (mode == true && this.layer.features.length <= 2) { // 2: line + one point
+        if (mode == true && this.layer.features.length <= 4) { // 4: line + two points + one middle point
             return;
         }
         this.deleteMode = mode;
         for (var i = this.layer.features.length; i-->0;) {
             var feature = this.layer.features[i];
-            if (feature.geometry instanceof OpenLayers.Geometry.Point) {
+            if (feature.geometry instanceof OpenLayers.Geometry.Point && feature.type != "middle") {
                 feature.renderIntent = this.deleteMode ? "select": "";
                 this.layer.drawFeature(feature);
             }
@@ -350,7 +473,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     /**
      * Method: clickFeatureEvent
      * Handle click on a feature. If we are in deleteMode, remove that feature.
-     * 
+     *
      * Parameters:
      * feature - {OpenLayers.Feature.Vector} Feature that was clicked
      */
@@ -358,27 +481,48 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         if (!this.deleteMode) {
             return;
         }
-        for (var i = feature.layer.features.length; i-->0; ) {
-            var feat = feature.layer.features[i];
-            if (feat == feature) {
-                continue;
-            }
-            if (!feat.geometry.components) {
-                continue;
-            }
+        if (feature.type == "middle") {
+            return;
+        }
 
-            var idx = feat.geometry.components.indexOf(feature.geometry);
-            if (idx != -1) {
-                feat.geometry.components.splice(idx, 1);
+        var points = [];
+        for (var i = 0; i < this.layer.features.length; i++) {
+            if (this.layer.features[i].geometry instanceof OpenLayers.Geometry.Point) {
+                points.push(this.layer.features[i]);
             }
         }
+        var idx = OpenLayers.Util.indexOf(points, feature);
+        if (idx == -1) {
+            return;
+        }
+
+        var prevFeature = points[idx - 1];
+        var nextFeature = points[idx + 1];
+
+        if (nextFeature && prevFeature) {
+            this.addMiddlePoint(
+                        (points[idx - 2].geometry.x + points[idx + 2].geometry.x) / 2,
+                        (points[idx - 2].geometry.y + points[idx + 2].geometry.y) / 2,
+                        feature, "before"
+            );
+        }
+
         this.callback("delete", [feature, feature.layer.features]);
-        feature.destroy();
-        this.layer.redraw();
+
+        if (prevFeature) {
+            this.removeFeature(prevFeature);
+        }
+        this.removeFeature(feature);
+        if (nextFeature) {
+            this.removeFeature(nextFeature);
+        }
+
+        this.drawFeature();
+
         OpenLayers.Element.removeClass(
             this.map.viewPortDiv, "olModifiablePathOver"
         );
-        if (this.layer.features.length <= 2) { // 2: line + one point
+        if (this.layer.features.length <= 4) { // 4: line + two points + one middle point
             this.enterDeleteMode(false);
         }
     },
@@ -386,7 +530,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     /**
      * Method: overFeatureEvent
      * Handle overing on a feature. If we are in deleteMode, modify viewport classname
-     * 
+     *
      * Parameters:
      * feature - {OpenLayers.Feature.Vector} Feature that was clicked
      */
@@ -401,7 +545,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     /**
      * Method: outFeatureEvent
      * Handle out of a feature. If we are in deleteMode, modify viewport classname
-     * 
+     *
      * Parameters:
      * feature - {OpenLayers.Feature.Vector} Feature that was clicked
      */

@@ -17,16 +17,62 @@
     <script src="http://openlayers.org/api/OpenLayers.js"></script>
     <script src="../ModifiablePath.js"></script>
     <script type="text/javascript">
+
+        var styleMap = new OpenLayers.StyleMap({
+            "default": new OpenLayers.Style(
+                OpenLayers.Util.extend(OpenLayers.Feature.Vector.style["default"], 
+                {
+                    pointRadius: "${radius}",
+                    strokeOpacity: "${opacity}",
+                    fillOpacity: "${opacity}"
+               }),
+                /* point style will be different for middle points */
+               {
+                 context: {
+                     radius: function(feature) {
+                         if (feature.type == "middle") {
+                             return 3;
+                         } else {
+                             return 5;
+                         }
+                     },
+                    opacity: function (feature) {
+                         if (feature.type == "middle") {
+                             return 0.5;
+                         } else {
+                             return 1.0;
+                         }
+                    }
+                 }
+             })
+        });
+
+        var lineStyleMap = new OpenLayers.StyleMap({
+            "default": new OpenLayers.Style({
+                strokeColor: "black",
+                strokeWidth: 2
+            })
+        });
+
        function init(){
             var map = new OpenLayers.Map('map');
             var wms = new OpenLayers.Layer.WMS( "OpenLayers WMS", 
                 "http://labs.metacarta.com/wms/vmap0?", {layers: 'basic'}); 
             OpenLayers.Feature.Vector.style['default']['strokeWidth'] = '2';
-            var vectors = new OpenLayers.Layer.Vector("Vector Layer");
+            var vectors = new OpenLayers.Layer.Vector("Vector Layer", {
+                styleMap: lineStyleMap
+            });
 
             map.addLayers([wms, vectors]);
 
-            var control = new OpenLayers.Control.DrawFeature(vectors, OpenLayers.Handler.ModifiablePath);
+            var control = new OpenLayers.Control.DrawFeature(vectors, OpenLayers.Handler.ModifiablePath, {
+                handlerOptions: {
+                    layerOptions: {
+                        styleMap: styleMap
+                    }
+                }
+            });
+
 
             map.addControl(control);
             control.activate();
@@ -44,7 +90,11 @@
 
         <p>Click on the map to add points. Double click to finalize path. Once
         a point been added, you can modify it by selecting it then dragging it
-        to a new location. Also, when pressing Shift key, you enter in delete
+        to a new location. When a new point is entered, a temporary middle
+        point appears. That point can be used to split portion of a path. So,
+        new points can be added as needed.</p>
+
+        <p>Also, when pressing Shift key, you enter in delete
         mode. When in delete mode, clicking on a point of the path deletes the
         point. Releasing Shift key leaves delete mode.</p>
 
