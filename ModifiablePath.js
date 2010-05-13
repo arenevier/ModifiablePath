@@ -459,9 +459,6 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * {Boolean} true to enter, false to leave
      */
     enterDeleteMode: function (mode) {
-        if (mode == true && this.layer.features.length <= 2) { // 2: line + one point
-            return;
-        }
         this.deleteMode = mode;
         for (var i = this.layer.features.length; i-->0;) {
             var feature = this.layer.features[i];
@@ -516,6 +513,16 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
 
         this.callback("delete", [feature, feature.layer.features]);
 
+        var lastPoint = (!nextFeature && !prevFeature);
+
+        if (lastPoint) {
+            // we need to remove linestring from layer before removing last
+            // feature; otherwise, linestring will be redrawn (in
+            // removeFeature) without any point, and that will throw an
+            // exception in canvas renderer
+            this.layer.removeFeatures([this.line]);
+        }
+
         if (prevFeature) {
             this.removeFeature(prevFeature);
         }
@@ -529,9 +536,16 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         OpenLayers.Element.removeClass(
             this.map.viewPortDiv, "olModifiablePathOver"
         );
-        if (this.layer.features.length <= 2) { // 2: line + one point
+
+        if (lastPoint) {
             this.enterDeleteMode(false);
+            this.line.destroy();
+            this.lastUp = null;
+            for (var item in this.handlers) {
+                this.handlers[item].activate();
+            }
         }
+
     },
 
     /**
