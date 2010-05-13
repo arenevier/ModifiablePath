@@ -242,7 +242,14 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * feature - {OpenLayers.Feature.Vector} Feature to remove
      */
     removeFeature: function(feature) {
-        this.line.geometry.removeComponent(feature.geometry);
+        // we don't call removeComponent of this.line.geometry directly because
+        // LineString native method prevent removing a point when there are
+        // less than 2 left. We don't want that, but we can't use
+        // OpenLayers.Geometry.Curve or OpenLayers.Geometry.MultiPoint because
+        // they are not rendered on the map
+        OpenLayers.Geometry.Collection.prototype.removeComponent.apply(
+                                                            this.line.geometry,
+                                                            [feature.geometry]);
         feature.destroy();
         this.layer.removeFeatures([feature], { silent: (feature.type == "middle" ? true: false)});
 
@@ -452,7 +459,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * {Boolean} true to enter, false to leave
      */
     enterDeleteMode: function (mode) {
-        if (mode == true && this.layer.features.length <= 4) { // 4: line + two points + one middle point
+        if (mode == true && this.layer.features.length <= 2) { // 2: line + one point
             return;
         }
         this.deleteMode = mode;
@@ -522,7 +529,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         OpenLayers.Element.removeClass(
             this.map.viewPortDiv, "olModifiablePathOver"
         );
-        if (this.layer.features.length <= 4) { // 4: line + two points + one middle point
+        if (this.layer.features.length <= 2) { // 2: line + one point
             this.enterDeleteMode(false);
         }
     },
