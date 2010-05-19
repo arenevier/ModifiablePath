@@ -414,6 +414,11 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             this.finalize();
             return true;
         }
+        // that probably means mousedown was prevented by another control. We
+        // don't want to add a point when clicking on another control
+        if (!this.mouseDown) {
+            return true;
+        }
 
         if(this.lastUp == null) {
             if(this.persist) {
