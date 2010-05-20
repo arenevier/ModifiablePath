@@ -156,7 +156,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                         }
                     }
 
-                    this.callback("modify", [dragFeature, this.line]);
+                    this.callback("modify", [dragFeature, this.line, "modify"]);
                     this.drawFeature();
 
                 }, this)
@@ -229,8 +229,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             this.point.geometry, this.line.geometry.components.length
         );
 
-        this.callback("point", [this.point.geometry, this.getGeometry()]);
-        this.callback("modify", [this.point.geometry, this.line]);
+        this.callback("modify", [middlePoint, this.line, "add"]);
         this.drawFeature();
     },
 
@@ -516,8 +515,6 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             );
         }
 
-        this.callback("delete", [feature, feature.layer.features]);
-
         var lastPoint = (!nextFeature && !prevFeature);
 
         if (lastPoint) {
@@ -535,6 +532,8 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         if (nextFeature) {
             this.removeFeature(nextFeature);
         }
+
+        this.callback("modify", [feature, this.line, "delete"]);
 
         this.drawFeature();
 
