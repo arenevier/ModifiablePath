@@ -134,17 +134,22 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                         previousPoint = components[idx - 1];
                         dragFeature.type = "";
 
-                        if (nextPoint) {
-                            this.addMiddlePoint(
-                                (dragFeature.geometry.x + nextPoint.x) / 2,
-                                (dragFeature.geometry.y + nextPoint.y) / 2,
-                                dragFeature, "after");
-                        }
-                        if (previousPoint) {
-                            this.addMiddlePoint(
-                                    (dragFeature.geometry.x + previousPoint.x) / 2,
-                                    (dragFeature.geometry.y + previousPoint.y) / 2,
-                                    dragFeature, "before");
+                        this.addMiddlePoint(
+                            (dragFeature.geometry.x + nextPoint.x) / 2,
+                            (dragFeature.geometry.y + nextPoint.y) / 2,
+                            dragFeature, "after");
+
+                        this.addMiddlePoint(
+                                (dragFeature.geometry.x + previousPoint.x) / 2,
+                                (dragFeature.geometry.y + previousPoint.y) / 2,
+                                dragFeature, "before");
+
+                        for (var i = 0; i < this.realPoints.length; i++) {
+                            var geom = this.realPoints[i].geometry;
+                            if (geom == previousPoint) {
+                                this.realPoints.splice(i + 1, 0, dragFeature);
+                                break;
+                            }
                         }
                     } else {
 
