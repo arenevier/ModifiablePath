@@ -55,6 +55,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     lastMoveDrag: false,
 
     /**
+     * Property: realPoints
+     * {Array(<OpenLayers.Feature.Vector>)} an array containing features representing real points
+     */
+    realPoints: [],
+
+    /**
      * Constructor: OpenLayers.Handler.ModifiablePath
      * Create a new path hander
      *
@@ -100,6 +106,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         this.point = new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.Point(lonlat.lon, lonlat.lat)
         );
+        this.realPoints.push(this.point);
         this.line = new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString([this.point.geometry])
         );
@@ -220,6 +227,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         this.point = new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.Point(lonlat.lon, lonlat.lat)
         );
+        this.realPoints.push(this.point);
 
         this.layer.addFeatures([middlePoint, this.point]);
         this.line.geometry.addComponent(
@@ -350,6 +358,9 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             }
         }
         OpenLayers.Handler.Point.prototype.finalize.apply(this, arguments);
+        if(cancel || !this.persist) {
+            this.realPoints = [];
+        }
         for (var item in this.handlers) {
             this.handlers[item].deactivate();
         }
@@ -529,6 +540,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             this.removeFeature(prevFeature);
         }
         this.removeFeature(feature);
+        OpenLayers.Util.removeItem(this.realPoints, feature);
         if (nextFeature) {
             this.removeFeature(nextFeature);
         }
