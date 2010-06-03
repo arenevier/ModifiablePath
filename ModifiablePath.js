@@ -480,12 +480,10 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      */
     enterDeleteMode: function (mode) {
         this.deleteMode = mode;
-        for (var i = this.layer.features.length; i-->0;) {
-            var feature = this.layer.features[i];
-            if (feature.geometry instanceof OpenLayers.Geometry.Point && feature.type != "middle") {
-                feature.renderIntent = this.deleteMode ? "select": "";
-                this.layer.drawFeature(feature);
-            }
+        for (var i = this.realPoints.length; i-->0;) {
+            var feature = this.realPoints[i];
+            feature.renderIntent = this.deleteMode ? "select": "";
+            this.layer.drawFeature(feature);
         }
         if (this.deleteMode) {
             this.handlers.drag.deactivate();
