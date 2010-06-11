@@ -215,34 +215,40 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     },
 
     /**
-     * Method: addPoint
-     * Add point to geometry.  Send the point index to override
+     * Method: addPoints
+     * Add points to geometry.  Send the points index to override
      * the behavior of LinearRing that disregards adding duplicate points.
      *
      * Parameters:
-     * pixel - {<OpenLayers.Pixel>} The pixel location for the new point.
+     * pixel - {Array(<OpenLayers.Pixel>)}
      */
-    addPoint: function(pixel) {
-        var lonlat = this.map.getLonLatFromPixel(pixel);
-        var middlePoint = new OpenLayers.Feature.Vector(
-            new OpenLayers.Geometry.Point((this.point.geometry.x + lonlat.lon) / 2, (this.point.geometry.y + lonlat.lat) / 2)
-        );
-        middlePoint.type = "middle";
+    addPoints: function(pixels) {
+        if (!(pixels instanceof Array)) {
+            pixels = [pixels];
+        }
 
-        this.point = new OpenLayers.Feature.Vector(
-            new OpenLayers.Geometry.Point(lonlat.lon, lonlat.lat)
-        );
-        this.realPoints.push(this.point);
+        for (var i=0, len=pixels.length; i<len; i++) {
+            var lonlat = this.map.getLonLatFromPixel(pixels[i]);
+            var middlePoint = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.Point((this.point.geometry.x + lonlat.lon) / 2, (this.point.geometry.y + lonlat.lat) / 2)
+            );
+            middlePoint.type = "middle";
 
-        this.layer.addFeatures([middlePoint, this.point]);
-        this.line.geometry.addComponent(
-            middlePoint.geometry, this.line.geometry.components.length
-        );
-        this.line.geometry.addComponent(
-            this.point.geometry, this.line.geometry.components.length
-        );
+            this.point = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.Point(lonlat.lon, lonlat.lat)
+            );
+            this.realPoints.push(this.point);
 
-        this.callback("modify", [middlePoint, this.line, "add"]);
+            this.layer.addFeatures([middlePoint, this.point]);
+            this.line.geometry.addComponent(
+                middlePoint.geometry, this.line.geometry.components.length
+            );
+            this.line.geometry.addComponent(
+                this.point.geometry, this.line.geometry.components.length
+            );
+
+            this.callback("modify", [middlePoint, this.line, "add"]);
+        }
         this.drawFeature();
     },
 
@@ -441,7 +447,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             }
             this.createFeature(evt.xy);
         } else {
-            this.addPoint(evt.xy);
+            this.addPoints(evt.xy);
         }
 
         this.mouseDown = false;
