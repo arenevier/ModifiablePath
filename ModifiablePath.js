@@ -49,6 +49,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     deleteMode: false,
 
     /**
+     * Property: mouseOverMap
+     * {Boolean} true if mouse is over map
+     */
+    deleteMode: false,
+
+    /**
      * Property: lastMoveDrag
      * {Boolean} true if last time mouse was down, a drag action occured
      */
@@ -191,6 +197,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                 Event.stop(evt);
                 return this.handle(evt) ? !this.stopClick : true;
             }
+            this.mouseOverMap = true;
             this.map.events.register("mouseout", this, function(evt) {
                 // when mouse leaves map area, leave delete mode
                 if (this.deleteMode) {
@@ -206,6 +213,10 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                     }
                     this.enterDeleteMode(false);
                 }
+                this.mouseOverMap = false;
+            });
+            this.map.events.register("mouseover", this, function(evt) {
+                this.mouseOverMap = true;
             });
         }
 
@@ -465,6 +476,9 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * evt - {Event} The browser event
      */
     handleKeyEvent: function (evt) {
+        if (!this.mouseOverMap) {
+            return;
+        }
         if (evt.keyCode != this.deleteKey) {
             return;
         }
