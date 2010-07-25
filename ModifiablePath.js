@@ -180,6 +180,13 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                 }, this)
             }
             this.handlers.drag = new OpenLayers.Control.DragFeature(this.layer, dragOptions);
+            var pristineMousedown = this.handlers.drag.handlers.drag.mousedown;
+            var self = this;
+            this.handlers.drag.handlers.drag.mousedown = function() {
+                console.log('drag mousedown');
+                self.mouseDown = true;
+                pristineMousedown.apply(this, arguments);
+            };
             this.map.addControl(this.handlers.drag);
         }
 
@@ -520,6 +527,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * feature - {OpenLayers.Feature.Vector} Feature that was clicked
      */
     clickFeatureEvent: function (feature) {
+        console.log('clickFeatureEvent');
         if (!this.deleteMode) {
             return;
         }
