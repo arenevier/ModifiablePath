@@ -27,7 +27,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * Property: line
      * {<OpenLayers.Feature.Vector>}
      */
-    line: null,
+    'line': null,
 
     /**
      * Property: handlers
@@ -52,7 +52,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * Property: mouseOverMap
      * {Boolean} true if mouse is over map
      */
-    deleteMode: false,
+    mouseOverMap: false,
 
     /**
      * Property: lastMoveDrag
@@ -130,12 +130,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                     this.lastMoveDrag = true;
                     var components = this.line.geometry.components;
                     var idx = OpenLayers.Util.indexOf(components, dragFeature.geometry);
-                    if (idx == -1) {
+                    if (idx === -1) {
                         return;
                     }
 
-                    var nextPoint, previousPoint, middlePoint;
-                    if (dragFeature.type == "middle") {
+                    var nextPoint, previousPoint, middlePoint, i;
+                    if (dragFeature.type === "middle") {
                         nextPoint = components[idx + 1];
                         previousPoint = components[idx - 1];
                         dragFeature.type = "";
@@ -150,9 +150,9 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                                 (dragFeature.geometry.y + previousPoint.y) / 2,
                                 dragFeature, "before");
 
-                        for (var i = 0; i < this.realPoints.length; i++) {
+                        for (i = 0; i < this.realPoints.length; i++) {
                             var geom = this.realPoints[i].geometry;
-                            if (geom == previousPoint) {
+                            if (geom === previousPoint) {
                                 this.realPoints.splice(i + 1, 0, dragFeature);
                                 break;
                             }
@@ -178,7 +178,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                     this.drawFeature();
 
                 }, this)
-            }
+            };
             this.handlers.drag = new OpenLayers.Control.DragFeature(this.layer, dragOptions);
             var pristineMousedown = this.handlers.drag.handlers.drag.mousedown;
             var self = this;
@@ -194,15 +194,15 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                 click: this.clickFeatureEvent,
                 over: this.overFeatureEvent,
                 out: this.outFeatureEvent
-            }
+            };
             var featureOptions = {
                 geometryTypes: "OpenLayers.Geometry.Point"
-            }
+            };
             this.handlers.feature = new OpenLayers.Handler.Feature(this, this.layer, featureCallbacks);
             this.handlers.feature.click = function(evt) {
                 Event.stop(evt);
                 return this.handle(evt) ? !this.stopClick : true;
-            }
+            };
             this.mouseOverMap = true;
             this.map.events.register("mouseout", this, function(evt) {
                 // when mouse leaves map area, leave delete mode
@@ -210,7 +210,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                     var target = (evt.relatedTarget) ? evt.relatedTarget : evt.toElement;
                     var par = target;
                     while (par) {
-                        if (par == this.map.viewPortDiv) {
+                        if (par === this.map.viewPortDiv) {
                             // mouseout occured to another element of map
                             // viewport. Do not leave delete mode
                             return;
@@ -226,7 +226,8 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             });
         }
 
-        for (var item in this.handlers) {
+        var item;
+        for (item in this.handlers) {
             this.handlers[item].activate();
         }
     },
@@ -244,7 +245,8 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             pixels = [pixels];
         }
 
-        for (var i=0, len=pixels.length; i<len; i++) {
+        var i;
+        for (i=0, len=pixels.length; i<len; i++) {
             var lonlat = this.map.getLonLatFromPixel(pixels[i]);
             var middlePoint = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.Point((this.point.geometry.x + lonlat.lon) / 2, (this.point.geometry.y + lonlat.lat) / 2)
@@ -291,12 +293,13 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                                                             this.line.geometry,
                                                             [feature.geometry]);
         feature.destroy();
-        this.layer.removeFeatures([feature], { silent: (feature.type == "middle" ? true: false)});
+        this.layer.removeFeatures([feature], { silent: (feature.type === "middle" ? true: false)});
 
-        if (this.point == feature) {
-            for (var i = this.layer.features.length; i-->0; ) {
+        var i;
+        if (this.point === feature) {
+            for (i = this.layer.features.length; i-->0; ) {
                 var feat = this.layer.features[i];
-                if (feat.geometry instanceof OpenLayers.Geometry.Point && feat.type != "middle") {
+                if (feat.geometry instanceof OpenLayers.Geometry.Point && feat.type !== "middle") {
                     this.point = feat;
                     break;
                 }
@@ -319,12 +322,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      */
     addMiddlePoint: function(x, y, feature, after) {
         var idx = OpenLayers.Util.indexOf(this.layer.features, feature);
-        if (idx == -1) {
+        if (idx === -1) {
             return false;
         }
-        if (after == "after") {
+        if (after === "after") {
             after = true;
-        } else if (after == "before") {
+        } else if (after === "before") {
             after = false;
         }
 
@@ -384,9 +387,10 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      *     false.
      */
     finalize: function(cancel) {
-        for (var i = this.layer.features.length; i-->0; ) {
+        var i, item;
+        for (i = this.layer.features.length; i-->0; ) {
             var feat = this.layer.features[i];
-            if (feat.geometry instanceof OpenLayers.Geometry.Point && feat.type == "middle") {
+            if (feat.geometry instanceof OpenLayers.Geometry.Point && feat.type === "middle") {
                 this.removeFeature(feat);
             }
         }
@@ -394,7 +398,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         if(cancel || !this.persist) {
             this.realPoints = [];
         }
-        for (var item in this.handlers) {
+        for (item in this.handlers) {
             this.handlers[item].deactivate();
         }
     },
@@ -463,7 +467,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             return true;
         }
 
-        if(this.lastUp == null) {
+        if(this.lastUp === null) {
             if(this.persist) {
                 this.destroyFeature();
             }
@@ -490,13 +494,13 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         if (!this.mouseOverMap) {
             return;
         }
-        if (evt.keyCode != this.deleteKey) {
+        if (evt.keyCode !== this.deleteKey) {
             return;
         }
-        if (evt.type == "keydown" && this.deleteMode) {
+        if (evt.type === "keydown" && this.deleteMode) {
             return;
         }
-        if (evt.type == "keyup" && !this.deleteMode) {
+        if (evt.type === "keyup" && !this.deleteMode) {
             return;
         }
         this.enterDeleteMode(!this.deleteMode);
@@ -510,8 +514,10 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * {Boolean} true to enter, false to leave
      */
     enterDeleteMode: function (mode) {
+        var i;
+
         this.deleteMode = mode;
-        for (var i = this.realPoints.length; i-->0;) {
+        for (i = this.realPoints.length; i-->0;) {
             var feature = this.realPoints[i];
             feature.renderIntent = this.deleteMode ? "select": "";
             this.layer.drawFeature(feature);
@@ -534,18 +540,18 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         if (!this.deleteMode) {
             return;
         }
-        if (feature.type == "middle") {
+        if (feature.type === "middle") {
             return;
         }
 
-        var points = [];
-        for (var i = 0; i < this.layer.features.length; i++) {
+        var points = [], i;
+        for (i = 0; i < this.layer.features.length; i++) {
             if (this.layer.features[i].geometry instanceof OpenLayers.Geometry.Point) {
                 points.push(this.layer.features[i]);
             }
         }
         var idx = OpenLayers.Util.indexOf(points, feature);
-        if (idx == -1) {
+        if (idx === -1) {
             return;
         }
 
@@ -587,11 +593,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
             this.map.viewPortDiv, "olModifiablePathOver"
         );
 
+        var item;
         if (lastPoint) {
             this.enterDeleteMode(false);
             this.line.destroy();
             this.lastUp = null;
-            for (var item in this.handlers) {
+            for (item in this.handlers) {
                 this.handlers[item].activate();
             }
         }
@@ -606,8 +613,9 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * feature - {OpenLayers.Feature.Vector} Feature that was clicked
      */
     overFeatureEvent: function (feature) {
-        if (!this.deleteMode)
+        if (!this.deleteMode) {
             return;
+        }
         OpenLayers.Element.addClass(
                 this.map.viewPortDiv, "olModifiablePathOver"
         );
@@ -621,8 +629,9 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * feature - {OpenLayers.Feature.Vector} Feature that was clicked
      */
     outFeatureEvent: function (feature) {
-        if (!this.deleteMode)
+        if (!this.deleteMode) {
             return;
+        }
         OpenLayers.Element.removeClass(
                 this.map.viewPortDiv, "olModifiablePathOver"
         );
