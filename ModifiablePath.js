@@ -264,7 +264,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
                 this.point.geometry, this.line.geometry.components.length
             );
 
-            this.callback("modify", [middlePoint, this.line, "add"]);
+            if (pixels.length <= 1) {
+                this.callback("modify", [middlePoint, this.line, "add"]);
+            }
+        }
+        if (pixels.length > 1) {
+            this.callback("modify", [null, this.line, "add"]);
         }
         this.drawFeature();
     },
