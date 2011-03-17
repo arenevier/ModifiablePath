@@ -388,10 +388,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      */
     finalize: function(cancel) {
         var i, item;
-        for (i = this.layer.features.length; i-->0; ) {
-            var feat = this.layer.features[i];
-            if (feat.geometry instanceof OpenLayers.Geometry.Point && feat.type === "middle") {
-                this.removeFeature(feat);
+        if (this.layer) {
+            for (i = this.layer.features.length; i-->0; ) {
+                var feat = this.layer.features[i];
+                if (feat.geometry instanceof OpenLayers.Geometry.Point && feat.type === "middle") {
+                    this.removeFeature(feat);
+                }
             }
         }
         OpenLayers.Handler.Point.prototype.finalize.apply(this, arguments);
