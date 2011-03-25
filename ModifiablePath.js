@@ -67,6 +67,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
     realPoints: [],
 
     /**
+     * Property: touch
+     * {Boolean} Indcates the support of touch events.
+     */
+    touch: false,
+
+    /**
      * Constructor: OpenLayers.Handler.ModifiablePath
      * Create a new path hander
      *
@@ -419,6 +425,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * {Boolean} Allow event propagation
      */
     mousedown: function(evt) {
+        if (this.touch) {
+            return;
+        }
+        return this.down(evt);
+    },
+    down: function(evt) {
         if (this.deleteMode) {
             return true;
         }
@@ -440,6 +452,11 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * {Boolean} Allow event propagation
      */
     mousemove: function (evt) {
+        if (this.touch) {
+            return;
+        }
+    },
+    move: function() {
         return true;
     },
 
@@ -455,6 +472,12 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
      * {Boolean} Allow event propagation
      */
     mouseup: function (evt) {
+        if (this.touch) {
+            return;
+        }
+        return this.up(evt);
+    },
+    up: function(evt) {
         if (this.deleteMode) {
             return true;
         }
