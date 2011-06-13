@@ -366,7 +366,7 @@ OpenLayers.Handler.ModifiablePath = OpenLayers.Class(OpenLayers.Handler.Point, {
         if (this.layer.renderer instanceof OpenLayers.Renderer.Canvas) {
             // XXX: to have handlers.drag working, we need getFeatureIdFromEvent
             // to return Point (and not LineString). So, we erase this.line.
-            // As, it will be added back in layer.redrawe, it will be after
+            // As, it will be added back in layer.redraw, it will be after
             // Point in array position, and getFeatureIdFromEvent will return
             // correct answer
             this.layer.renderer.eraseFeatures(this.line);
